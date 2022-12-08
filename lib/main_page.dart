@@ -1,6 +1,5 @@
 import 'dart:math';
 import 'dart:ui';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:dart_ping/dart_ping.dart';
@@ -23,7 +22,6 @@ class PingCheckData {
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
-
   @override
   State<StatefulWidget> createState() {
     return MainPageState();
@@ -48,25 +46,18 @@ class MainPageState extends State<MainPage> {
   bool isPingTestRunning = false;
   late List<PingTestHistoryItemData> pingLog;
   Ping? ping;
-  bool soundEnabled = true;
-
+  bool soundEnabled = false;
   int bestPingValue = 0;
-  int worstPingValue = 1000;
-
+  int worstPingValue = 1999;
   int maxHistoryLogLength = 24;
   late TextEditingController hostInputTextContoller;
-
-  late AudioPlayer player;
+  AudioPlayer player = AudioPlayer();
 
   @override
   void initState() {
     hostInputTextContoller = TextEditingController(text: targetHostUrl);
     pingLog = <PingTestHistoryItemData>[];
-
-    if (Platform.isAndroid) {
-      player = AudioPlayer();
-    }
-
+    player.setVolume(0.1);
     super.initState();
   }
 
@@ -81,21 +72,45 @@ class MainPageState extends State<MainPage> {
     return Scaffold(
       backgroundColor: Colors.black26,
       appBar: AppBar(
-        title: Row(mainAxisAlignment: MainAxisAlignment.center, children: const [
-          Text(
-            "Ping'O'Meter",
-          )
-        ]),
-        backgroundColor: Colors.black,
-        actions: [
-          IconButton(
-              onPressed: () {
-                soundEnabled = !soundEnabled;
-              },
-              icon: Icon(soundEnabled ? Icons.volume_up_outlined : Icons.volume_mute_outlined)),
-          IconButton(onPressed: () {}, icon: const Icon(Icons.info_outline))
-        ],
-      ),
+          title: Padding(
+            padding: const EdgeInsets.only(left: 24),
+            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              const Expanded(
+                flex: 1,
+                child: Text(
+                  "Ping'O'Meter",
+                ),
+              ),
+              if (Platform.isAndroid)
+                IconButton(
+                  onPressed: () {
+                    soundEnabled = !soundEnabled;
+                    setState(() {});
+                  },
+                  icon: Icon(soundEnabled ? Icons.volume_up_outlined : Icons.volume_mute_outlined),
+                  color: soundEnabled ? Colors.white : Colors.white60,
+                ),
+              IconButton(
+                  onPressed: () => showDialog<String>(
+                        context: context,
+                        builder: (BuildContext context) => AlertDialog(
+                          title: const Text("Pingo'O'Meter"),
+                          content: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: const [Text('created by @sanyabeast'), Text('2022, Kyiv, Ukraine')]),
+                          actions: <Widget>[
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, 'OK'),
+                              child: const Text('Close'),
+                            ),
+                          ],
+                        ),
+                      ),
+                  icon: const Icon(Icons.info_outline))
+            ]),
+          ),
+          backgroundColor: Colors.black),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -186,13 +201,9 @@ class MainPageState extends State<MainPage> {
     if (ping != null) {
       stopTest();
     }
-    ping = Ping(targetHostUrl, timeout: pingCommandTimeout);
-
-    print("start pinging $targetHostUrl");
-    //Begin ping process and listen for output
+    ping = Ping(targetHostUrl, timeout: pingCommandTimeout, interval: 2);
     ping?.stream.listen((event) {
       if (isPingTestRunning) {
-        print(event.response?.time?.inMilliseconds.toString());
         pingLog.insert(
             0,
             PingTestHistoryItemData(
@@ -201,24 +212,22 @@ class MainPageState extends State<MainPage> {
         if (pingLog.length > maxHistoryLogLength) {
           pingLog.removeAt(pingLog.length - 1);
         }
-
-        if (soundEnabled) {
-          playBadnessLevelSoundEffect(event.response?.time != null, event.response?.time?.inMilliseconds.toDouble() ?? 0);
-        }
-
+        playBadnessLevelSoundEffect(event.response?.time != null, event.response?.time?.inMilliseconds.toDouble() ?? 0);
         setState(() {});
       }
     });
-
     setState(() {});
   }
 
   playBadnessLevelSoundEffect(bool isSuccess, double pingValue) async {
-    double badness = getPingBadness(pingValue);
-    int audioIndex = lerpDouble(0, 4, badness)!.toInt();
-    print(audioIndex);
+    if (!soundEnabled) {
+      return;
+    }
+
     if (Platform.isAndroid) {
-      final duration = await player.setUrl('asset:assets/audio/level_$audioIndex.ogg'); // Schemes: (https: | file: | asset: )
+      double pitch = !isSuccess ? 0.1 : lerpDouble(1, 0.25, pow(getPingBadness(pingValue), 0.5).toDouble())!;
+      await player.setUrl('asset:assets/audio/level_5.ogg');
+      player.setPitch(pitch);
       player.play();
     }
   }
@@ -243,7 +252,6 @@ class MainPageState extends State<MainPage> {
 
   buildHistoryItemsDataRows() {
     List<DataRow> ret = [];
-
     if (pingLog.isNotEmpty) {
       for (PingTestHistoryItemData item in pingLog) {
         ret.add(DataRow(

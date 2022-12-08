@@ -138,46 +138,14 @@ class MainPageState extends State<MainPage> {
               ),
             ),
             Expanded(
-                flex: 1,
-                child: SingleChildScrollView(
-                  child: DataTable(
-                    columns: const <DataColumn>[
-                      DataColumn(
-                        label: Expanded(
-                          child: Text(
-                            '№',
-                            style: TextStyle(fontStyle: FontStyle.italic),
-                          ),
-                        ),
-                      ),
-                      DataColumn(
-                        label: Expanded(
-                          child: Text(
-                            'Status',
-                            style: TextStyle(fontStyle: FontStyle.italic),
-                          ),
-                        ),
-                      ),
-                      DataColumn(
-                        label: Expanded(
-                          child: Text(
-                            'Host',
-                            style: TextStyle(fontStyle: FontStyle.italic),
-                          ),
-                        ),
-                      ),
-                      DataColumn(
-                        label: Expanded(
-                          child: Text(
-                            'Ping (ms)',
-                            style: TextStyle(fontStyle: FontStyle.normal, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ),
-                    ],
-                    rows: buildHistoryItemsDataRows(),
-                  ),
-                ))
+              flex: 1,
+              child: Padding(
+                  padding: const EdgeInsets.only(left: 24, right: 24, top: 0, bottom: 0),
+                  child: SingleChildScrollView(
+                      child: Column(
+                    children: buildHistoryItemsDataRows(),
+                  ))),
+            )
           ]),
         ),
       ),
@@ -251,45 +219,56 @@ class MainPageState extends State<MainPage> {
   }
 
   buildHistoryItemsDataRows() {
-    List<DataRow> ret = [];
     if (pingLog.isNotEmpty) {
-      for (PingTestHistoryItemData item in pingLog) {
-        ret.add(DataRow(
-          selected: item.index % 2 == 0,
-          cells: <DataCell>[
-            DataCell(Text(
-              item.index.toString(),
-              style: TextStyle(color: generateColor(item.timeout, item.isSuccess)),
-            )),
-            DataCell(Icon(
-              item.isSuccess ? Icons.done_all : Icons.error,
-              color: generateColor(item.timeout, item.isSuccess),
-            )),
-            DataCell(Text(
-              item.hostUrl,
-              style: TextStyle(color: generateColor(item.timeout, item.isSuccess)),
-            )),
-            DataCell(Text(
-              item.timeout.toString(),
-              style: TextStyle(color: generateColor(item.timeout, item.isSuccess)),
-            )),
-          ],
-        ));
-      }
+      return <Widget>[
+        for (PingTestHistoryItemData item in pingLog)
+          SizedBox(
+            height: 32,
+            child: Row(
+              mainAxisSize: MainAxisSize.max,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                    flex: 1,
+                    child: Text(
+                      item.index.toString(),
+                      style: TextStyle(color: generateColor(item.timeout, item.isSuccess)),
+                    )),
+                Expanded(
+                    flex: 2,
+                    child: Icon(
+                      item.isSuccess ? Icons.done_all : Icons.error,
+                      color: generateColor(item.timeout, item.isSuccess),
+                    )),
+                Expanded(
+                  flex: 4,
+                  child: Text(
+                    item.hostUrl.length > 16 ? "${item.hostUrl.substring(0, 13)}..." : item.hostUrl,
+                    textAlign: TextAlign.right,
+                    style: TextStyle(color: generateColor(item.timeout, item.isSuccess)),
+                  ),
+                ),
+                Expanded(
+                    flex: 2,
+                    child: Text(
+                      item.timeout.toString(),
+                      textAlign: TextAlign.right,
+                      style: TextStyle(color: generateColor(item.timeout, item.isSuccess)),
+                    ))
+              ],
+            ),
+          )
+      ];
     } else {
-      for (int i = 0; i < maxHistoryLogLength; i++) {
-        ret.add(const DataRow(
-          cells: <DataCell>[
-            DataCell(Text("")),
-            DataCell(Text("")),
-            DataCell(Text("")),
-            DataCell(Text("")),
-          ],
-        ));
-      }
+      return <Widget>[
+        for (int i = 0; i < maxHistoryLogLength; i++)
+          Row(
+            mainAxisSize: MainAxisSize.max,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: const [Divider()],
+          )
+      ];
     }
-
-    return ret;
   }
 
   double getPingBadness(double pingValue) {

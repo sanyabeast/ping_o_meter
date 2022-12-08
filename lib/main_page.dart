@@ -28,17 +28,20 @@ class MainPage extends StatefulWidget {
 }
 
 class PingTestHistoryItemData {
+  static int count = 0;
+  int index = 0;
   bool isSuccess = false;
   double timeout = 0;
   String hostUrl;
-
-  PingTestHistoryItemData(
-      {required this.isSuccess, required this.timeout, required this.hostUrl});
+  PingTestHistoryItemData({required this.isSuccess, required this.timeout, required this.hostUrl}) {
+    index = PingTestHistoryItemData.count;
+    PingTestHistoryItemData.count++;
+  }
 }
 
 class MainPageState extends State<MainPage> {
   String targetHostUrl = "google.com";
-  final int timeout = 2;
+  final int pingCommandTimeout = 2;
   bool isPingTestRunning = false;
   late List<PingTestHistoryItemData> pingLog;
   Ping? ping;
@@ -46,7 +49,7 @@ class MainPageState extends State<MainPage> {
   int bestPingValue = 0;
   int worstPingValue = 1000;
 
-  int maxHistoryLogLength = 10;
+  int maxHistoryLogLength = 24;
   late TextEditingController hostInputTextContoller;
 
   @override
@@ -64,82 +67,84 @@ class MainPageState extends State<MainPage> {
 
   @override
   Widget build(BuildContext context) {
-    ;
-
     return Scaffold(
       backgroundColor: Colors.black26,
       appBar: AppBar(
-        title: const Text('Ping`O`Meter'),
-        backgroundColor: Colors.blueGrey.shade900,
+        title: Row(mainAxisAlignment: MainAxisAlignment.center, children: const [
+          Text(
+            "Ping'O'Meter",
+          )
+        ]),
+        backgroundColor: Colors.black,
       ),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Column(
-              mainAxisSize: MainAxisSize.max,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SizedBox(
-                  height: 24,
+          child: Column(mainAxisSize: MainAxisSize.max, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 15, bottom: 32, left: 16, right: 16),
+              child: TextField(
+                controller: hostInputTextContoller,
+                onTap: () {
+                  // hostInputTextContoller.clear();
+                  hostInputTextContoller.selectAll();
+                },
+                onSubmitted: (String value) {
+                  targetHostUrl = value;
+                  if (isPingTestRunning) {
+                    startTest();
+                  }
+                  // clearHistory();
+                },
+                obscureText: false,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  labelText: 'Host',
                 ),
-                TextField(
-                  controller: hostInputTextContoller,
-                  onTap: () {
-                    // hostInputTextContoller.clear();
-                    hostInputTextContoller.selectAll();
-                  },
-                  onSubmitted: (String value) {
-                    targetHostUrl = value;
-                    if (isPingTestRunning) {
-                      startTest();
-                    }
-                    // clearHistory();
-                  },
-                  obscureText: false,
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    labelText: 'Host',
-                  ),
-                ),
-                const SizedBox(
-                  height: 24,
-                ),
-                Expanded(
-                    flex: 1,
-                    child: SingleChildScrollView(
-                      child: DataTable(
-                        columns: const <DataColumn>[
-                          DataColumn(
-                            label: Expanded(
-                              child: Text(
-                                '#',
-                                style: TextStyle(fontStyle: FontStyle.italic),
-                              ),
-                            ),
+              ),
+            ),
+            Expanded(
+                flex: 1,
+                child: SingleChildScrollView(
+                  child: DataTable(
+                    columns: const <DataColumn>[
+                      DataColumn(
+                        label: Expanded(
+                          child: Text(
+                            '№',
+                            style: TextStyle(fontStyle: FontStyle.italic),
                           ),
-                          DataColumn(
-                            label: Expanded(
-                              child: Text(
-                                'Host',
-                                style: TextStyle(fontStyle: FontStyle.italic),
-                              ),
-                            ),
-                          ),
-                          DataColumn(
-                            label: Expanded(
-                              child: Text(
-                                'Time',
-                                style: TextStyle(
-                                    fontStyle: FontStyle.normal,
-                                    fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ),
-                        ],
-                        rows: buildHistoryItemsDataRows(),
+                        ),
                       ),
-                    ))
-              ]),
+                      DataColumn(
+                        label: Expanded(
+                          child: Text(
+                            'Status',
+                            style: TextStyle(fontStyle: FontStyle.italic),
+                          ),
+                        ),
+                      ),
+                      DataColumn(
+                        label: Expanded(
+                          child: Text(
+                            'Host',
+                            style: TextStyle(fontStyle: FontStyle.italic),
+                          ),
+                        ),
+                      ),
+                      DataColumn(
+                        label: Expanded(
+                          child: Text(
+                            'Ping (ms)',
+                            style: TextStyle(fontStyle: FontStyle.normal, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                    ],
+                    rows: buildHistoryItemsDataRows(),
+                  ),
+                ))
+          ]),
         ),
       ),
       floatingActionButton: FloatingActionButton(
@@ -152,10 +157,8 @@ class MainPageState extends State<MainPage> {
           }
           // Add your onPressed code here!
         },
-        backgroundColor: isPingTestRunning ? Colors.red : Colors.amber,
-        child: isPingTestRunning
-            ? const Icon(Icons.stop)
-            : const Icon(Icons.play_arrow),
+        backgroundColor: isPingTestRunning ? Colors.amber : Colors.lightGreen,
+        child: isPingTestRunning ? const Icon(Icons.stop) : const Icon(Icons.play_arrow),
       ),
     );
   }
@@ -164,7 +167,7 @@ class MainPageState extends State<MainPage> {
     if (ping != null) {
       stopTest();
     }
-    ping = Ping(targetHostUrl, timeout: timeout);
+    ping = Ping(targetHostUrl, timeout: pingCommandTimeout);
 
     print("start pinging $targetHostUrl");
     //Begin ping process and listen for output
@@ -174,9 +177,7 @@ class MainPageState extends State<MainPage> {
         pingLog.insert(
             0,
             PingTestHistoryItemData(
-                isSuccess: event.response?.time != null,
-                timeout: event.response?.time?.inMilliseconds.toDouble() ?? 0,
-                hostUrl: targetHostUrl));
+                isSuccess: event.response?.time != null, timeout: event.response?.time?.inMilliseconds.toDouble() ?? 0, hostUrl: targetHostUrl));
 
         if (pingLog.length > maxHistoryLogLength) {
           pingLog.removeAt(pingLog.length - 1);
@@ -212,7 +213,12 @@ class MainPageState extends State<MainPage> {
     if (pingLog.isNotEmpty) {
       for (PingTestHistoryItemData item in pingLog) {
         ret.add(DataRow(
+          selected: item.index % 2 == 0,
           cells: <DataCell>[
+            DataCell(Text(
+              item.index.toString(),
+              style: TextStyle(color: generateColor(item.timeout, item.isSuccess)),
+            )),
             DataCell(
               Icon(
                 item.isSuccess ? Icons.done_all : Icons.error,
@@ -221,13 +227,11 @@ class MainPageState extends State<MainPage> {
             ),
             DataCell(Text(
               item.hostUrl,
-              style:
-                  TextStyle(color: generateColor(item.timeout, item.isSuccess)),
+              style: TextStyle(color: generateColor(item.timeout, item.isSuccess)),
             )),
             DataCell(Text(
               item.timeout.toString(),
-              style:
-                  TextStyle(color: generateColor(item.timeout, item.isSuccess)),
+              style: TextStyle(color: generateColor(item.timeout, item.isSuccess)),
             )),
           ],
         ));
@@ -239,6 +243,7 @@ class MainPageState extends State<MainPage> {
             DataCell(Text("")),
             DataCell(Text("")),
             DataCell(Text("")),
+            DataCell(Text("")),
           ],
         ));
       }
@@ -247,18 +252,17 @@ class MainPageState extends State<MainPage> {
     return ret;
   }
 
+  double getPingBadness(double pingValue) {
+    double badness = clampDouble((pingValue - bestPingValue) / (worstPingValue - bestPingValue), 0, 1);
+    badness = pow(badness, 0.5) as double;
+    return badness;
+  }
+
   Color generateColor(double pingValue, bool isSuccess) {
     if (!isSuccess) {
       return Colors.redAccent.shade200;
     } else {
-      double badness = clampDouble(
-          (pingValue - bestPingValue) / (worstPingValue - bestPingValue), 0, 1);
-      print("badness: $badness");
-
-      badness = pow(badness, 0.5) as double;
-      // badness = 1;
-
-      return Color.lerp(Colors.white, Colors.orangeAccent.shade400, badness)!;
+      return Color.lerp(Colors.white, Colors.orangeAccent.shade400, getPingBadness(pingValue))!;
     }
   }
 }

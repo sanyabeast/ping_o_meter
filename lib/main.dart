@@ -13,7 +13,7 @@ class PingOMeter extends StatelessWidget {
       title: 'Ping`O`Meter',
       theme: ThemeData(
         brightness: Brightness.dark,
-        primarySwatch: Colors.blueGrey,
+        primarySwatch: Colors.lightGreen,
       ),
       home: const MainPage(),
     );

@@ -36,20 +36,20 @@ class PingTestHistoryItemData {
   String hostUrl;
   PingTestHistoryItemData({required this.isSuccess, required this.timeout, required this.hostUrl}) {
     index = PingTestHistoryItemData.count;
-    PingTestHistoryItemData.count++;
+    PingTestHistoryItemData.count = (PingTestHistoryItemData.count + 1) % 99;
   }
 }
 
 class MainPageState extends State<MainPage> {
   String targetHostUrl = "google.com";
-  final int pingCommandTimeout = 2;
+  final int pingCommandTimeout = 1;
   bool isPingTestRunning = false;
   late List<PingTestHistoryItemData> pingLog;
   Ping? ping;
   bool soundEnabled = false;
   int bestPingValue = 0;
-  int worstPingValue = 1999;
-  int maxHistoryLogLength = 24;
+  int worstPingValue = 999;
+  int maxHistoryLogLength = 32;
   late TextEditingController hostInputTextContoller;
   AudioPlayer player = AudioPlayer();
 
@@ -68,37 +68,45 @@ class MainPageState extends State<MainPage> {
   }
 
   @override
+  void dispose() {
+    stopTest();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black26,
       appBar: AppBar(
           title: Padding(
-            padding: const EdgeInsets.only(left: 24),
+            padding: const EdgeInsets.only(left: 24, right: 8),
             child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
               const Expanded(
                 flex: 1,
-                child: Text(
-                  "Ping'O'Meter",
-                ),
+                child: Text("Ping'O'Meter", style: TextStyle(fontSize: 18)),
               ),
-              if (Platform.isAndroid)
+              if (isAudioPaybackSupported())
                 IconButton(
                   onPressed: () {
                     soundEnabled = !soundEnabled;
                     setState(() {});
                   },
-                  icon: Icon(soundEnabled ? Icons.volume_up_outlined : Icons.volume_mute_outlined),
-                  color: soundEnabled ? Colors.white : Colors.white60,
+                  icon: Icon(soundEnabled ? Icons.volume_up_rounded : Icons.volume_mute_rounded),
+                  color: soundEnabled ? Colors.white : Colors.white,
                 ),
               IconButton(
                   onPressed: () => showDialog<String>(
                         context: context,
                         builder: (BuildContext context) => AlertDialog(
-                          title: const Text("Pingo'O'Meter"),
+                          title: const Center(
+                              child: Text("Pingo'O'Meter", style: TextStyle(fontSize: 12))),
                           content: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               mainAxisSize: MainAxisSize.min,
-                              children: const [Text('created by @sanyabeast'), Text('2022, Kyiv, Ukraine')]),
+                              children: const [
+                                Text('created by @sanyabeast'),
+                                Text('2022, Kyiv, Ukraine')
+                              ]),
                           actions: <Widget>[
                             TextButton(
                               onPressed: () => Navigator.pop(context, 'OK'),
@@ -107,46 +115,49 @@ class MainPageState extends State<MainPage> {
                           ],
                         ),
                       ),
-                  icon: const Icon(Icons.info_outline))
+                  icon: const Icon(Icons.question_mark_rounded))
             ]),
           ),
           backgroundColor: Colors.black),
       body: Center(
         child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(mainAxisSize: MainAxisSize.max, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 15, bottom: 32, left: 16, right: 16),
-              child: TextField(
-                controller: hostInputTextContoller,
-                onTap: () {
-                  // hostInputTextContoller.clear();
-                  hostInputTextContoller.selectAll();
-                },
-                onSubmitted: (String value) {
-                  targetHostUrl = value;
-                  if (isPingTestRunning) {
-                    startTest();
-                  }
-                  // clearHistory();
-                },
-                obscureText: false,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Host',
+          padding: const EdgeInsets.all(8),
+          child: Column(
+              mainAxisSize: MainAxisSize.max,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 16, bottom: 32, left: 16, right: 16),
+                  child: TextField(
+                    controller: hostInputTextContoller,
+                    onTap: () {
+                      // hostInputTextContoller.clear();
+                      hostInputTextContoller.selectAll();
+                    },
+                    onSubmitted: (String value) {
+                      targetHostUrl = value;
+                      if (isPingTestRunning) {
+                        startTest();
+                      }
+                      // clearHistory();
+                    },
+                    obscureText: false,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      labelText: 'Host',
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            Expanded(
-              flex: 1,
-              child: Padding(
-                  padding: const EdgeInsets.only(left: 24, right: 24, top: 0, bottom: 0),
-                  child: SingleChildScrollView(
-                      child: Column(
-                    children: buildHistoryItemsDataRows(),
-                  ))),
-            )
-          ]),
+                Expanded(
+                  flex: 1,
+                  child: Padding(
+                      padding: const EdgeInsets.only(left: 16, right: 16, top: 0, bottom: 0),
+                      child: SingleChildScrollView(
+                          child: Column(
+                        children: buildHistoryItemsDataRows(),
+                      ))),
+                )
+              ]),
         ),
       ),
       floatingActionButton: FloatingActionButton(
@@ -160,7 +171,9 @@ class MainPageState extends State<MainPage> {
           // Add your onPressed code here!
         },
         backgroundColor: isPingTestRunning ? Colors.amber : Colors.lightGreen,
-        child: isPingTestRunning ? const Icon(Icons.stop) : const Icon(Icons.play_arrow),
+        child: isPingTestRunning
+            ? const Icon(Icons.cancel_rounded)
+            : const Icon(Icons.play_arrow_rounded),
       ),
     );
   }
@@ -175,12 +188,15 @@ class MainPageState extends State<MainPage> {
         pingLog.insert(
             0,
             PingTestHistoryItemData(
-                isSuccess: event.response?.time != null, timeout: event.response?.time?.inMilliseconds.toDouble() ?? 0, hostUrl: targetHostUrl));
+                isSuccess: event.response?.time != null,
+                timeout: event.response?.time?.inMilliseconds.toDouble() ?? 0,
+                hostUrl: targetHostUrl));
 
         if (pingLog.length > maxHistoryLogLength) {
           pingLog.removeAt(pingLog.length - 1);
         }
-        playBadnessLevelSoundEffect(event.response?.time != null, event.response?.time?.inMilliseconds.toDouble() ?? 0);
+        playBadnessLevelSoundEffect(
+            event.response?.time != null, event.response?.time?.inMilliseconds.toDouble() ?? 0);
         setState(() {});
       }
     });
@@ -192,12 +208,24 @@ class MainPageState extends State<MainPage> {
       return;
     }
 
-    if (Platform.isAndroid) {
-      double pitch = !isSuccess ? 0.1 : lerpDouble(1, 0.25, pow(getPingBadness(pingValue), 0.5).toDouble())!;
-      await player.setUrl('asset:assets/audio/level_5.ogg');
-      player.setPitch(pitch);
-      player.play();
+    if (isAudioPaybackSupported()) {
+      double pitch =
+          !isSuccess ? 0.1 : lerpDouble(1, 0.25, pow(getPingBadness(pingValue), 1).toDouble())!;
+
+      if (Platform.isAndroid) {
+        await player.setUrl('asset:assets/audio/level_5.ogg');
+        player.setPitch(pitch);
+        player.play();
+      } else if (Platform.isMacOS) {
+        int audioIndex = clampDouble(lerpDouble(0, 6, pitch)!, 0, 5).toInt();
+        await player.setUrl('asset:assets/audio/level_$audioIndex.mp3');
+        player.play();
+      }
     }
+  }
+
+  bool isAudioPaybackSupported() {
+    return Platform.isAndroid || Platform.isMacOS;
   }
 
   void stopTest() {
@@ -212,49 +240,52 @@ class MainPageState extends State<MainPage> {
     setState(() {});
   }
 
-  Container buildHistoryItem(dynamic item) {
-    return Container(
-      child: Text(item.toString()),
-    );
+  Text buildHistoryItem(dynamic item) {
+    return Text(item.toString());
   }
 
   buildHistoryItemsDataRows() {
     if (pingLog.isNotEmpty) {
       return <Widget>[
         for (PingTestHistoryItemData item in pingLog)
-          SizedBox(
+          Container(
             height: 32,
+            color: item.index % 2 == 0 ? Colors.transparent : Colors.white.withAlpha(10),
             child: Row(
               mainAxisSize: MainAxisSize.max,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Expanded(
-                    flex: 1,
-                    child: Text(
-                      item.index.toString(),
-                      style: TextStyle(color: generateColor(item.timeout, item.isSuccess)),
-                    )),
-                Expanded(
-                    flex: 2,
-                    child: Icon(
-                      item.isSuccess ? Icons.done_all : Icons.error,
-                      color: generateColor(item.timeout, item.isSuccess),
-                    )),
-                Expanded(
-                  flex: 4,
-                  child: Text(
-                    item.hostUrl.length > 16 ? "${item.hostUrl.substring(0, 13)}..." : item.hostUrl,
-                    textAlign: TextAlign.right,
-                    style: TextStyle(color: generateColor(item.timeout, item.isSuccess)),
+                SizedBox(
+                  width: 48,
+                  child: Icon(
+                    item.isSuccess ? Icons.done_all : Icons.error,
+                    color: generateColor(item.timeout, item.isSuccess),
                   ),
                 ),
                 Expanded(
-                    flex: 2,
+                  flex: 4,
+                  child: Text(
+                    item.hostUrl,
+                    textAlign: TextAlign.left,
+                    style: TextStyle(
+                        overflow: TextOverflow.ellipsis,
+                        color: generateColor(item.timeout, item.isSuccess)),
+                  ),
+                ),
+                SizedBox(
+                  width: 72,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 12),
                     child: Text(
                       item.timeout.toString(),
                       textAlign: TextAlign.right,
-                      style: TextStyle(color: generateColor(item.timeout, item.isSuccess)),
-                    ))
+                      style: TextStyle(
+                          overflow: TextOverflow.ellipsis,
+                          color: generateColor(item.timeout, item.isSuccess)),
+                    ),
+                  ),
+                )
               ],
             ),
           )
@@ -262,17 +293,17 @@ class MainPageState extends State<MainPage> {
     } else {
       return <Widget>[
         for (int i = 0; i < maxHistoryLogLength; i++)
-          Row(
-            mainAxisSize: MainAxisSize.max,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [Divider()],
+          const SizedBox(
+            height: 32,
+            child: Divider(),
           )
       ];
     }
   }
 
   double getPingBadness(double pingValue) {
-    double badness = clampDouble((pingValue - bestPingValue) / (worstPingValue - bestPingValue), 0, 1);
+    double badness =
+        clampDouble((pingValue - bestPingValue) / (worstPingValue - bestPingValue), 0, 1);
     badness = pow(badness, 0.5) as double;
     return badness;
   }

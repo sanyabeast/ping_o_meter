@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:dart_ping/dart_ping.dart';
+import 'package:just_audio/just_audio.dart';
 
 extension TextEditingControllerExt on TextEditingController {
   void selectAll() {
@@ -45,6 +46,7 @@ class MainPageState extends State<MainPage> {
   bool isPingTestRunning = false;
   late List<PingTestHistoryItemData> pingLog;
   Ping? ping;
+  bool soundEnabled = true;
 
   int bestPingValue = 0;
   int worstPingValue = 1000;
@@ -76,6 +78,14 @@ class MainPageState extends State<MainPage> {
           )
         ]),
         backgroundColor: Colors.black,
+        actions: [
+          IconButton(
+              onPressed: () {
+                soundEnabled = !soundEnabled;
+              },
+              icon: Icon(soundEnabled ? Icons.volume_up_outlined : Icons.volume_mute_outlined)),
+          IconButton(onPressed: () {}, icon: const Icon(Icons.info_outline))
+        ],
       ),
       body: Center(
         child: Padding(
@@ -182,12 +192,19 @@ class MainPageState extends State<MainPage> {
         if (pingLog.length > maxHistoryLogLength) {
           pingLog.removeAt(pingLog.length - 1);
         }
+
+        if (soundEnabled) {
+          playSound(event.response?.time != null, event.response?.time?.inMilliseconds.toDouble() ?? 0);
+        }
+
         setState(() {});
       }
     });
 
     setState(() {});
   }
+
+  playSound(bool isSuccess, double timeout) async {}
 
   void stopTest() {
     print("stop pinging $targetHostUrl");
@@ -219,12 +236,10 @@ class MainPageState extends State<MainPage> {
               item.index.toString(),
               style: TextStyle(color: generateColor(item.timeout, item.isSuccess)),
             )),
-            DataCell(
-              Icon(
-                item.isSuccess ? Icons.done_all : Icons.error,
-                color: generateColor(item.timeout, item.isSuccess),
-              ),
-            ),
+            DataCell(Icon(
+              item.isSuccess ? Icons.done_all : Icons.error,
+              color: generateColor(item.timeout, item.isSuccess),
+            )),
             DataCell(Text(
               item.hostUrl,
               style: TextStyle(color: generateColor(item.timeout, item.isSuccess)),

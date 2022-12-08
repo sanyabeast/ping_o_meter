@@ -1,9 +1,11 @@
 import 'dart:math';
+import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:dart_ping/dart_ping.dart';
 import 'package:just_audio/just_audio.dart';
+import 'dart:io';
 
 extension TextEditingControllerExt on TextEditingController {
   void selectAll() {
@@ -54,10 +56,17 @@ class MainPageState extends State<MainPage> {
   int maxHistoryLogLength = 24;
   late TextEditingController hostInputTextContoller;
 
+  late AudioPlayer player;
+
   @override
   void initState() {
     hostInputTextContoller = TextEditingController(text: targetHostUrl);
     pingLog = <PingTestHistoryItemData>[];
+
+    if (Platform.isAndroid) {
+      player = AudioPlayer();
+    }
+
     super.initState();
   }
 
@@ -194,7 +203,7 @@ class MainPageState extends State<MainPage> {
         }
 
         if (soundEnabled) {
-          playSound(event.response?.time != null, event.response?.time?.inMilliseconds.toDouble() ?? 0);
+          playBadnessLevelSoundEffect(event.response?.time != null, event.response?.time?.inMilliseconds.toDouble() ?? 0);
         }
 
         setState(() {});
@@ -204,7 +213,15 @@ class MainPageState extends State<MainPage> {
     setState(() {});
   }
 
-  playSound(bool isSuccess, double timeout) async {}
+  playBadnessLevelSoundEffect(bool isSuccess, double pingValue) async {
+    double badness = getPingBadness(pingValue);
+    int audioIndex = lerpDouble(0, 4, badness)!.toInt();
+    print(audioIndex);
+    if (Platform.isAndroid) {
+      final duration = await player.setUrl('asset:assets/audio/level_$audioIndex.ogg'); // Schemes: (https: | file: | asset: )
+      player.play();
+    }
+  }
 
   void stopTest() {
     print("stop pinging $targetHostUrl");

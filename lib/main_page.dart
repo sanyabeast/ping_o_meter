@@ -57,7 +57,7 @@ class MainPageState extends State<MainPage> {
   void initState() {
     hostInputTextContoller = TextEditingController(text: targetHostUrl);
     pingLog = <PingTestHistoryItemData>[];
-    player.setVolume(0.1);
+    player.setVolume(0.025);
     super.initState();
   }
 
@@ -182,7 +182,7 @@ class MainPageState extends State<MainPage> {
     if (ping != null) {
       stopTest();
     }
-    ping = Ping(targetHostUrl, timeout: pingCommandTimeout, interval: 2);
+    ping = Ping(targetHostUrl, timeout: pingCommandTimeout, interval: 2, count: 99);
     ping?.stream.listen((event) {
       if (isPingTestRunning) {
         pingLog.insert(

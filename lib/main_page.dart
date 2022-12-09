@@ -1,10 +1,10 @@
+// author: @sanyabeast. Fri 9 Dec 2022
+
 import 'dart:math';
-import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:dart_ping/dart_ping.dart';
-import 'package:just_audio/just_audio.dart';
-import 'dart:io';
+import "package:ping_o_meter/beeper.dart";
 
 extension TextEditingControllerExt on TextEditingController {
   void selectAll() {
@@ -28,36 +28,22 @@ class MainPage extends StatefulWidget {
   }
 }
 
-class PingTestHistoryItemData {
-  static int count = 0;
-  int index = 0;
-  bool isSuccess = false;
-  double timeout = 0;
-  String hostUrl;
-  PingTestHistoryItemData({required this.isSuccess, required this.timeout, required this.hostUrl}) {
-    index = PingTestHistoryItemData.count;
-    PingTestHistoryItemData.count = (PingTestHistoryItemData.count + 1) % 99;
-  }
-}
-
 class MainPageState extends State<MainPage> {
   String targetHostUrl = "google.com";
   final int pingCommandTimeout = 1;
   bool isPingTestRunning = false;
   late List<PingTestHistoryItemData> pingLog;
   Ping? ping;
-  bool soundEnabled = false;
   int bestPingValue = 0;
   int worstPingValue = 999;
   int maxHistoryLogLength = 32;
   late TextEditingController hostInputTextContoller;
-  AudioPlayer player = AudioPlayer();
+  Beeper beeper = Beeper();
 
   @override
   void initState() {
     hostInputTextContoller = TextEditingController(text: targetHostUrl);
     pingLog = <PingTestHistoryItemData>[];
-    player.setVolume(0.025);
     super.initState();
   }
 
@@ -85,14 +71,14 @@ class MainPageState extends State<MainPage> {
                 flex: 1,
                 child: Text("Ping'O'Meter", style: TextStyle(fontSize: 18)),
               ),
-              if (isAudioPaybackSupported())
+              if (beeper.isAudioPaybackSupported)
                 IconButton(
                   onPressed: () {
-                    soundEnabled = !soundEnabled;
+                    beeper.toggleMute();
                     setState(() {});
                   },
-                  icon: Icon(soundEnabled ? Icons.volume_up_rounded : Icons.volume_mute_rounded),
-                  color: soundEnabled ? Colors.white : Colors.white,
+                  icon: Icon(!beeper.muted ? Icons.volume_up_rounded : Icons.volume_mute_rounded),
+                  color: !beeper.muted ? Colors.white : Colors.white,
                 ),
               IconButton(
                   onPressed: () => showDialog<String>(
@@ -195,37 +181,13 @@ class MainPageState extends State<MainPage> {
         if (pingLog.length > maxHistoryLogLength) {
           pingLog.removeAt(pingLog.length - 1);
         }
-        playBadnessLevelSoundEffect(
-            event.response?.time != null, event.response?.time?.inMilliseconds.toDouble() ?? 0);
+        beeper.beepLatencyQuality(
+            computeLatencyQualityFactor(event.response?.time?.inMilliseconds.toDouble() ?? 0),
+            event.response?.time != null);
         setState(() {});
       }
     });
     setState(() {});
-  }
-
-  playBadnessLevelSoundEffect(bool isSuccess, double pingValue) async {
-    if (!soundEnabled) {
-      return;
-    }
-
-    if (isAudioPaybackSupported()) {
-      double pitch =
-          !isSuccess ? 0.1 : lerpDouble(1, 0.25, pow(getPingBadness(pingValue), 1).toDouble())!;
-
-      if (Platform.isAndroid) {
-        await player.setUrl('asset:assets/audio/level_5.ogg');
-        player.setPitch(pitch);
-        player.play();
-      } else if (Platform.isMacOS) {
-        int audioIndex = clampDouble(lerpDouble(0, 6, pitch)!, 0, 5).toInt();
-        await player.setUrl('asset:assets/audio/level_$audioIndex.mp3');
-        player.play();
-      }
-    }
-  }
-
-  bool isAudioPaybackSupported() {
-    return Platform.isAndroid || Platform.isMacOS;
   }
 
   void stopTest() {
@@ -301,18 +263,31 @@ class MainPageState extends State<MainPage> {
     }
   }
 
-  double getPingBadness(double pingValue) {
-    double badness =
-        clampDouble((pingValue - bestPingValue) / (worstPingValue - bestPingValue), 0, 1);
-    badness = pow(badness, 0.5) as double;
-    return badness;
+  double computeLatencyQualityFactor(double latency) {
+    double latencyQuality =
+        1 - clampDouble((latency - bestPingValue) / (worstPingValue - bestPingValue), 0, 1);
+    latencyQuality = pow(latencyQuality, 2) as double;
+    return latencyQuality;
   }
 
-  Color generateColor(double pingValue, bool isSuccess) {
+  Color generateColor(double latency, bool isSuccess) {
     if (!isSuccess) {
       return Colors.redAccent.shade200;
     } else {
-      return Color.lerp(Colors.white, Colors.orangeAccent.shade400, getPingBadness(pingValue))!;
+      return Color.lerp(
+          Colors.white, Colors.orangeAccent.shade400, computeLatencyQualityFactor(latency))!;
     }
+  }
+}
+
+class PingTestHistoryItemData {
+  static int count = 0;
+  int index = 0;
+  bool isSuccess = false;
+  double timeout = 0;
+  String hostUrl;
+  PingTestHistoryItemData({required this.isSuccess, required this.timeout, required this.hostUrl}) {
+    index = PingTestHistoryItemData.count;
+    PingTestHistoryItemData.count = (PingTestHistoryItemData.count + 1) % 99;
   }
 }

@@ -30,7 +30,7 @@ class MainPage extends StatefulWidget {
 
 class MainPageState extends State<MainPage> {
   String targetHostUrl = "google.com";
-  final int pingCommandTimeout = 1;
+  final int pingCommandTimeout = 2;
   bool isPingTestRunning = false;
   late List<PingTestHistoryItemData> pingLog;
   Ping? ping;
@@ -266,7 +266,7 @@ class MainPageState extends State<MainPage> {
   double computeLatencyQualityFactor(double latency) {
     double latencyQuality =
         1 - clampDouble((latency - bestPingValue) / (worstPingValue - bestPingValue), 0, 1);
-    latencyQuality = pow(latencyQuality, 2) as double;
+    latencyQuality = pow(latencyQuality, 4) as double;
     return latencyQuality;
   }
 
@@ -274,8 +274,8 @@ class MainPageState extends State<MainPage> {
     if (!isSuccess) {
       return Colors.redAccent.shade200;
     } else {
-      return Color.lerp(
-          Colors.white, Colors.orangeAccent.shade400, computeLatencyQualityFactor(latency))!;
+      return Color.lerp(const Color.fromARGB(255, 255, 119, 0), Colors.white,
+          computeLatencyQualityFactor(latency))!;
     }
   }
 }

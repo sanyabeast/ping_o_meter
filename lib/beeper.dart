@@ -7,9 +7,10 @@ import 'dart:io';
 import 'dart:math';
 
 class Beeper {
-  String audioNamePitched = "beep_a.ogg";
+  String audioNamePitched = "beep_f.ogg";
+  String audioNameFailure = "fail_b.ogg";
   List<String> audioNamesLeveled = [
-    "level_0.mp3",
+    "fail.mp3",
     "level_1.mp3",
     "level_2.mp3",
     "level_3.mp3",
@@ -22,8 +23,8 @@ class Beeper {
   AudioPlayer player = AudioPlayer();
 
   double pitchForNetworkError = 0.1;
-  double putchForBigLatency = 0.25;
-  double pitchForSmallLatency = 1;
+  double pitchForBigLatency = 0.15;
+  double pitchForSmallLatency = 1.1;
 
   Beeper() {
     player.setVolume(0.025);
@@ -42,21 +43,33 @@ class Beeper {
       return;
     }
 
-    if (isAudioPaybackSupported) {
-      double pitch = !isSuccess
-          ? pitchForNetworkError
-          : lerpDouble(
-              putchForBigLatency, pitchForSmallLatency, pow(latencyQuality, 1).toDouble())!;
+    double pitch = isSuccess
+        ? lerpDouble(pitchForBigLatency, pitchForSmallLatency, pow(latencyQuality, 1).toDouble())!
+        : pitchForNetworkError;
 
-      if (Platform.isAndroid) {
-        await player.setUrl('asset:assets/audio/$audioNamePitched');
-        player.setPitch(pitch);
-        player.play();
-      } else if (Platform.isMacOS) {
-        int audioIndex = clampDouble(lerpDouble(0, 6, pitch)!, 0, 5).toInt();
-        String audioName = audioNamesLeveled[audioIndex];
-        await player.setUrl('asset:assets/audio/$audioName');
-        player.play();
+    if (isAudioPaybackSupported) {
+      switch (Platform.operatingSystem) {
+        case "android":
+          {
+            String audioName = 'asset:assets/audio/$audioNamePitched';
+            if (!isSuccess) {
+              pitch = 1;
+              audioName = 'asset:assets/audio/$audioNameFailure';
+            }
+
+            await player.setUrl(audioName);
+            player.setPitch(pitch);
+            player.play();
+            break;
+          }
+        case "macos":
+          {
+            int audioIndex = clampDouble(lerpDouble(0, 6, pitch)!, 0, 5).toInt();
+            String audioName = audioNamesLeveled[audioIndex];
+            await player.setUrl('asset:assets/audio/$audioName');
+            player.play();
+            break;
+          }
       }
     }
   }

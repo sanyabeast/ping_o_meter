@@ -19,6 +19,10 @@ class PingTestHistoryItemData {
 }
 
 class Pinger with PersistentModule {
+  int bestPingValue = 0;
+  int worstPingValue = 999;
+  int maxHistoryLogLength = 32;
+
   final Function onUpdate;
   final Function(bool, double) onPingEvent;
   Pinger({required this.onUpdate, required this.onPingEvent}) {
@@ -54,12 +58,8 @@ class Pinger with PersistentModule {
   }
 
   bool get running => _running;
-
   late List<PingTestHistoryItemData> history;
   Ping? ping;
-  int bestPingValue = 0;
-  int worstPingValue = 999;
-  int maxHistoryLogLength = 32;
 
   @override
   onChanged() {
@@ -72,18 +72,13 @@ class Pinger with PersistentModule {
     ping?.stream.listen((event) {
       if (running) {
         history.insert(
-            0,
-            PingTestHistoryItemData(
-                isSuccess: event.response?.time != null,
-                timeout: event.response?.time?.inMilliseconds.toDouble() ?? 0,
-                hostUrl: host));
+            0, PingTestHistoryItemData(isSuccess: event.response?.time != null, timeout: event.response?.time?.inMilliseconds.toDouble() ?? 0, hostUrl: host));
 
         if (history.length > maxHistoryLogLength) {
           history.removeAt(history.length - 1);
         }
 
-        onPingEvent(
-            event.response?.time != null, event.response?.time?.inMilliseconds.toDouble() ?? 0);
+        onPingEvent(event.response?.time != null, event.response?.time?.inMilliseconds.toDouble() ?? 0);
         notifyChanged();
       }
     });
@@ -97,13 +92,6 @@ class Pinger with PersistentModule {
     ping?.stop();
     ping = null;
     notifyChanged();
-  }
-
-  double computeLatencyQualityFactor(double latency) {
-    double latencyQuality =
-        1 - clampDouble((latency - bestPingValue) / (worstPingValue - bestPingValue), 0, 1);
-    latencyQuality = pow(latencyQuality, 2) as double;
-    return latencyQuality;
   }
 
   @override

@@ -8,7 +8,7 @@ import 'dart:math';
 
 class Beeper {
   String audioNamePitched = "beep_f.ogg";
-  String audioNameFailure = "fail_b.ogg";
+  String audioNameFailure = "fail.ogg";
   List<String> audioNamesLeveled = [
     "fail.mp3",
     "level_1.mp3",

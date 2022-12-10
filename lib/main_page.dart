@@ -5,19 +5,16 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:dart_ping/dart_ping.dart';
 import "package:ping_o_meter/beeper.dart";
+import 'package:ping_o_meter/mixins/persistent_module.dart';
+
+const String appVersion = "0.9.0";
+const String defaultTargetHostUrl = "example.com";
 
 extension TextEditingControllerExt on TextEditingController {
   void selectAll() {
     if (text.isEmpty) return;
     selection = TextSelection(baseOffset: 0, extentOffset: text.length);
   }
-}
-
-const String defaultHost = "https://google.com";
-
-class PingCheckData {
-  String host = defaultHost;
-  bool isSuccess = false;
 }
 
 class MainPage extends StatefulWidget {
@@ -28,8 +25,8 @@ class MainPage extends StatefulWidget {
   }
 }
 
-class MainPageState extends State<MainPage> {
-  String targetHostUrl = "google.com";
+class MainPageState extends State<MainPage> with PersistentModule {
+  String targetHostUrl = defaultTargetHostUrl;
   final int pingCommandTimeout = 2;
   bool isPingTestRunning = false;
   late List<PingTestHistoryItemData> pingLog;
@@ -42,6 +39,7 @@ class MainPageState extends State<MainPage> {
 
   @override
   void initState() {
+    loadState();
     hostInputTextContoller = TextEditingController(text: targetHostUrl);
     pingLog = <PingTestHistoryItemData>[];
     super.initState();
@@ -60,6 +58,11 @@ class MainPageState extends State<MainPage> {
   }
 
   @override
+  onChanged() {
+    setState(() {});
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black26,
@@ -75,7 +78,7 @@ class MainPageState extends State<MainPage> {
                 IconButton(
                   onPressed: () {
                     beeper.toggleMute();
-                    setState(() {});
+                    notifyChanged(save: true);
                   },
                   icon: Icon(!beeper.muted ? Icons.volume_up_rounded : Icons.volume_mute_rounded),
                   color: !beeper.muted ? Colors.white : Colors.white,
@@ -85,12 +88,13 @@ class MainPageState extends State<MainPage> {
                         context: context,
                         builder: (BuildContext context) => AlertDialog(
                           title: const Center(
-                              child: Text("Pingo'O'Meter", style: TextStyle(fontSize: 12))),
+                              child: Text("Pingo'O'Meter | $appVersion",
+                                  style: TextStyle(fontSize: 16))),
                           content: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               mainAxisSize: MainAxisSize.min,
                               children: const [
-                                Text('created by @sanyabeast'),
+                                Text('Author: @sanyabeast'),
                                 Text('2022, Kyiv, Ukraine')
                               ]),
                           actions: <Widget>[
@@ -125,6 +129,7 @@ class MainPageState extends State<MainPage> {
                       if (isPingTestRunning) {
                         startTest();
                       }
+                      notifyChanged(save: true);
                       // clearHistory();
                     },
                     obscureText: false,
@@ -184,22 +189,22 @@ class MainPageState extends State<MainPage> {
         beeper.beepLatencyQuality(
             computeLatencyQualityFactor(event.response?.time?.inMilliseconds.toDouble() ?? 0),
             event.response?.time != null);
-        setState(() {});
+        notifyChanged();
       }
     });
-    setState(() {});
+    notifyChanged();
   }
 
   void stopTest() {
     print("stop pinging $targetHostUrl");
     ping?.stop();
     ping = null;
-    setState(() {});
+    notifyChanged();
   }
 
   clearHistory() {
     pingLog = <PingTestHistoryItemData>[];
-    setState(() {});
+    notifyChanged();
   }
 
   Text buildHistoryItem(dynamic item) {
@@ -266,7 +271,7 @@ class MainPageState extends State<MainPage> {
   double computeLatencyQualityFactor(double latency) {
     double latencyQuality =
         1 - clampDouble((latency - bestPingValue) / (worstPingValue - bestPingValue), 0, 1);
-    latencyQuality = pow(latencyQuality, 4) as double;
+    latencyQuality = pow(latencyQuality, 2) as double;
     return latencyQuality;
   }
 
@@ -277,6 +282,25 @@ class MainPageState extends State<MainPage> {
       return Color.lerp(const Color.fromARGB(255, 255, 119, 0), Colors.white,
           computeLatencyQualityFactor(latency))!;
     }
+  }
+
+  @override
+  loadState() async {
+    var settings = await loadData();
+    if (settings != null) {
+      beeper.muted = settings["audioMuted"] ?? false;
+      targetHostUrl = settings["targetHostUrl"] ?? defaultTargetHostUrl;
+      hostInputTextContoller.text = targetHostUrl;
+      notifyChanged();
+      if (kDebugMode) {
+        print(settings);
+      }
+    }
+  }
+
+  @override
+  saveState() {
+    saveData({"targetHostUrl": targetHostUrl, "audioMuted": beeper.muted});
   }
 }
 

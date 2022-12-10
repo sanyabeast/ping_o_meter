@@ -9,6 +9,7 @@ dependencies:
   cupertino_icons: ^1.0.2
   dart_ping: ^7.0.2
   just_audio: ^0.9.30
+  localstore: ^1.2.3
 dev_dependencies:
   flutter_test:
     sdk: flutter

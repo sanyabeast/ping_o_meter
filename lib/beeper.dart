@@ -10,7 +10,7 @@ class Beeper {
   String audioNamePitched = "beep_f.ogg";
   String audioNameFailure = "fail.ogg";
   List<String> audioNamesLeveled = [
-    "fail.mp3",
+    "level_0.mp3",
     "level_1.mp3",
     "level_2.mp3",
     "level_3.mp3",
@@ -23,7 +23,7 @@ class Beeper {
   AudioPlayer player = AudioPlayer();
 
   double pitchForNetworkError = 0.1;
-  double pitchForBigLatency = 0.15;
+  double pitchForBigLatency = 0.25;
   double pitchForSmallLatency = 1.1;
 
   Beeper() {

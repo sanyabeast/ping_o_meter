@@ -38,7 +38,7 @@ class Beeper {
     muted = !muted;
   }
 
-  beepLatencyQuality(double latencyQuality, bool isSuccess) async {
+  beepLatencyQuality(bool isSuccess, double latencyQuality) async {
     if (muted) {
       return;
     }

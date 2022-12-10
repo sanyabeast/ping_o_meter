@@ -1,14 +1,13 @@
 // author: @sanyabeast. Fri 9 Dec 2022
 
-import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:dart_ping/dart_ping.dart';
 import "package:ping_o_meter/beeper.dart";
 import 'package:ping_o_meter/mixins/persistent_module.dart';
+import 'package:ping_o_meter/pinger.dart';
+import 'package:ping_o_meter/widgets/settings_and_about.dart';
 
 const String appVersion = "0.9.0";
-const String defaultTargetHostUrl = "example.com";
 
 extension TextEditingControllerExt on TextEditingController {
   void selectAll() {
@@ -26,34 +25,32 @@ class MainPage extends StatefulWidget {
 }
 
 class MainPageState extends State<MainPage> with PersistentModule {
-  String targetHostUrl = defaultTargetHostUrl;
-  final int pingCommandTimeout = 2;
-  bool isPingTestRunning = false;
-  late List<PingTestHistoryItemData> pingLog;
-  Ping? ping;
-  int bestPingValue = 0;
-  int worstPingValue = 999;
-  int maxHistoryLogLength = 32;
   late TextEditingController hostInputTextContoller;
+  late Pinger pinger;
   Beeper beeper = Beeper();
 
   @override
   void initState() {
+    pinger = Pinger(onUpdate: () {
+      notifyChanged();
+    }, onPingEvent: (bool isSuccess, double latency) {
+      beeper.beepLatencyQuality(isSuccess, pinger.computeLatencyQualityFactor(latency));
+      notifyChanged();
+    });
     loadState();
-    hostInputTextContoller = TextEditingController(text: targetHostUrl);
-    pingLog = <PingTestHistoryItemData>[];
+    hostInputTextContoller = TextEditingController(text: pinger.host);
     super.initState();
   }
 
   @override
   void deactivate() {
-    stopTest();
+    pinger.stopTest();
     super.deactivate();
   }
 
   @override
   void dispose() {
-    stopTest();
+    pinger.stopTest();
     super.dispose();
   }
 
@@ -87,20 +84,14 @@ class MainPageState extends State<MainPage> with PersistentModule {
                   onPressed: () => showDialog<String>(
                         context: context,
                         builder: (BuildContext context) => AlertDialog(
-                          title: const Center(
-                              child: Text("Pingo'O'Meter | $appVersion",
-                                  style: TextStyle(fontSize: 16))),
-                          content: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              mainAxisSize: MainAxisSize.min,
-                              children: const [
-                                Text('Author: @sanyabeast'),
-                                Text('2022, Kyiv, Ukraine')
-                              ]),
+                          content: SettingsAndAboutWidget(
+                            onUpdated: () => notifyChanged(),
+                            pinger: pinger,
+                          ),
                           actions: <Widget>[
                             TextButton(
                               onPressed: () => Navigator.pop(context, 'OK'),
-                              child: const Text('Close'),
+                              child: const Text('Done'),
                             ),
                           ],
                         ),
@@ -125,11 +116,7 @@ class MainPageState extends State<MainPage> with PersistentModule {
                       hostInputTextContoller.selectAll();
                     },
                     onSubmitted: (String value) {
-                      targetHostUrl = value;
-                      if (isPingTestRunning) {
-                        startTest();
-                      }
-                      notifyChanged(save: true);
+                      pinger.host = value;
                       // clearHistory();
                     },
                     obscureText: false,
@@ -153,58 +140,16 @@ class MainPageState extends State<MainPage> with PersistentModule {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          isPingTestRunning = !isPingTestRunning;
-          if (isPingTestRunning) {
-            startTest();
-          } else {
-            stopTest();
-          }
+          pinger.running = !pinger.running;
+
           // Add your onPressed code here!
         },
-        backgroundColor: isPingTestRunning ? Colors.amber : Colors.lightGreen,
-        child: isPingTestRunning
+        backgroundColor: pinger.running ? Colors.amber : Colors.lightGreen,
+        child: pinger.running
             ? const Icon(Icons.cancel_rounded)
             : const Icon(Icons.play_arrow_rounded),
       ),
     );
-  }
-
-  void startTest() {
-    if (ping != null) {
-      stopTest();
-    }
-    ping = Ping(targetHostUrl, timeout: pingCommandTimeout, interval: 2, count: 99);
-    ping?.stream.listen((event) {
-      if (isPingTestRunning) {
-        pingLog.insert(
-            0,
-            PingTestHistoryItemData(
-                isSuccess: event.response?.time != null,
-                timeout: event.response?.time?.inMilliseconds.toDouble() ?? 0,
-                hostUrl: targetHostUrl));
-
-        if (pingLog.length > maxHistoryLogLength) {
-          pingLog.removeAt(pingLog.length - 1);
-        }
-        beeper.beepLatencyQuality(
-            computeLatencyQualityFactor(event.response?.time?.inMilliseconds.toDouble() ?? 0),
-            event.response?.time != null);
-        notifyChanged();
-      }
-    });
-    notifyChanged();
-  }
-
-  void stopTest() {
-    print("stop pinging $targetHostUrl");
-    ping?.stop();
-    ping = null;
-    notifyChanged();
-  }
-
-  clearHistory() {
-    pingLog = <PingTestHistoryItemData>[];
-    notifyChanged();
   }
 
   Text buildHistoryItem(dynamic item) {
@@ -212,9 +157,9 @@ class MainPageState extends State<MainPage> with PersistentModule {
   }
 
   buildHistoryItemsDataRows() {
-    if (pingLog.isNotEmpty) {
+    if (pinger.history!.isNotEmpty) {
       return <Widget>[
-        for (PingTestHistoryItemData item in pingLog)
+        for (PingTestHistoryItemData item in pinger.history)
           Container(
             height: 32,
             color: item.index % 2 == 0 ? Colors.transparent : Colors.white.withAlpha(10),
@@ -259,7 +204,7 @@ class MainPageState extends State<MainPage> with PersistentModule {
       ];
     } else {
       return <Widget>[
-        for (int i = 0; i < maxHistoryLogLength; i++)
+        for (int i = 0; i < pinger.maxHistoryLogLength; i++)
           const SizedBox(
             height: 32,
             child: Divider(),
@@ -268,29 +213,22 @@ class MainPageState extends State<MainPage> with PersistentModule {
     }
   }
 
-  double computeLatencyQualityFactor(double latency) {
-    double latencyQuality =
-        1 - clampDouble((latency - bestPingValue) / (worstPingValue - bestPingValue), 0, 1);
-    latencyQuality = pow(latencyQuality, 2) as double;
-    return latencyQuality;
-  }
-
   Color generateColor(double latency, bool isSuccess) {
     if (!isSuccess) {
       return Colors.redAccent.shade200;
     } else {
       return Color.lerp(const Color.fromARGB(255, 255, 119, 0), Colors.white,
-          computeLatencyQualityFactor(latency))!;
+          pinger.computeLatencyQualityFactor(latency))!;
     }
   }
 
   @override
   loadState() async {
-    var settings = await loadData();
+    var settings = await loadSavedData();
     if (settings != null) {
-      beeper.muted = settings["audioMuted"] ?? false;
-      targetHostUrl = settings["targetHostUrl"] ?? defaultTargetHostUrl;
-      hostInputTextContoller.text = targetHostUrl;
+      await pinger.loadState();
+      beeper.muted = settings["muted"] ?? false;
+      hostInputTextContoller.text = pinger.host;
       notifyChanged();
       if (kDebugMode) {
         print(settings);
@@ -300,18 +238,6 @@ class MainPageState extends State<MainPage> with PersistentModule {
 
   @override
   saveState() {
-    saveData({"targetHostUrl": targetHostUrl, "audioMuted": beeper.muted});
-  }
-}
-
-class PingTestHistoryItemData {
-  static int count = 0;
-  int index = 0;
-  bool isSuccess = false;
-  double timeout = 0;
-  String hostUrl;
-  PingTestHistoryItemData({required this.isSuccess, required this.timeout, required this.hostUrl}) {
-    index = PingTestHistoryItemData.count;
-    PingTestHistoryItemData.count = (PingTestHistoryItemData.count + 1) % 99;
+    saveData({"muted": beeper.muted});
   }
 }

@@ -19,7 +19,7 @@ class PersistentModule {
   saveState() {}
   saveData(Map<String, dynamic> data) =>
       db.collection("settings").doc(runtimeType.toString()).set(data);
-  Future<Map<String, dynamic>?> loadData() async {
+  Future<Map<String, dynamic>?> loadSavedData() async {
     return await db.collection("settings").doc(runtimeType.toString()).get();
   }
 }

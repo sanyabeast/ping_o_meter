@@ -64,7 +64,7 @@ class MainPageState extends State<MainPage> with PersistentModule {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black26,
+      backgroundColor: Colors.black,
       appBar: AppBar(
           title: Padding(
             padding: const EdgeInsets.only(left: 24, right: 8),
@@ -106,33 +106,37 @@ class MainPageState extends State<MainPage> with PersistentModule {
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(8),
-          child: Column(mainAxisSize: MainAxisSize.max, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 16, bottom: 32, left: 16, right: 16),
-              child: TextField(
-                controller: hostInputTextContoller,
-                onTap: () {
-                  // hostInputTextContoller.clear();
-                  hostInputTextContoller.selectAll();
-                },
-                onSubmitted: (String value) {
-                  pinger.host = value;
-                  // clearHistory();
-                },
-                obscureText: false,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Host',
+          child: Column(
+              mainAxisSize: MainAxisSize.max,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 16, bottom: 32, left: 16, right: 16),
+                  child: TextField(
+                    controller: hostInputTextContoller,
+                    onTap: () {
+                      // hostInputTextContoller.clear();
+                      hostInputTextContoller.selectAll();
+                    },
+                    onSubmitted: (String value) {
+                      pinger.host = value;
+                      // clearHistory();
+                    },
+                    obscureText: false,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      labelText: 'Host',
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            Expanded(
-              flex: 1,
-              child: Padding(
-                  padding: const EdgeInsets.only(left: 16, right: 16, top: 0, bottom: 0),
-                  child: SingleChildScrollView(child: HistoryTable(history: pinger.history, pinger: pinger))),
-            )
-          ]),
+                Expanded(
+                  flex: 1,
+                  child: Padding(
+                      padding: const EdgeInsets.only(left: 16, right: 16, top: 0, bottom: 0),
+                      child: SingleChildScrollView(
+                          child: HistoryTable(history: pinger.history, pinger: pinger))),
+                )
+              ]),
         ),
       ),
       floatingActionButton: FloatingActionButton(
@@ -141,8 +145,10 @@ class MainPageState extends State<MainPage> with PersistentModule {
 
           // Add your onPressed code here!
         },
-        backgroundColor: pinger.running ? Colors.amber : Colors.lightGreen,
-        child: pinger.running ? const Icon(Icons.cancel_rounded) : const Icon(Icons.play_arrow_rounded),
+        backgroundColor: pinger.running ? Colors.red : Colors.amber,
+        child: pinger.running
+            ? const Icon(Icons.cancel_rounded)
+            : const Icon(Icons.network_check_rounded),
       ),
     );
   }
